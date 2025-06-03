@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Повідомлення з Microsoft Teams</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      padding: 2rem;
+    }
+    h2 {
+      font-weight: 600;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 0.3em;
+      margin-bottom: 1em;
+      color: #58a6ff;
+    }
+    button {
+      background-color: #238636;
+      color: white;
+      border: none;
+      padding: 0.5em 1em;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    button:hover {
+      background-color: #2ea043;
+    }
+    input[type="datetime-local"] {
+      padding: 0.4em;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background-color: #161b22;
+      color: #c9d1d9;
+    }
+    label {
+      font-size: 0.95em;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+      background-color: #161b22;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(27, 31, 35, 0.1);
+    }
+    th, td {
+      border: 1px solid #30363d;
+      padding: 0.6em 1em;
+      text-align: left;
+    }
+    th {
+      background-color: #21262d;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+    a {
+      color: #58a6ff;
+    }
+    ul {
+      margin: 0;
+      padding-left: 1.2em;
+    }
+    li {
+      margin-bottom: 0.2em;
+    }
+  </style>
+</head>
+<body>
+  <h2>Список повідомлень Teams</h2>
+  <div>
+    <button onclick="loadMessages()">Завантажити повідомлення</button>
+    <label style="margin-left: 1em">
+      <input type="checkbox" id="filterNoReplies" /> Показати лише без коментарів
+    </label>
+    <label style="margin-left: 1em">
+      Дата до (UTC): <input type="datetime-local" id="cutoffDate" />
+    </label>
+  </div>
+
+  <hr>
+  <div id="output"></div>
+
+  <script>
+    async function loadMessages() {
+      const outputDiv = document.getElementById("output");
+      outputDiv.innerHTML = "Завантаження...";
+
+      try {
+        const response = await fetch("config.json");
+        const config = await response.json();
+
+        const token = config.token;
+        const teamId = config.teamId;
+        const channelId = config.channelId;
+        const filterNoReplies = document.getElementById("filterNoReplies").checked;
+        const cutoffRaw = document.getElementById("cutoffDate").value;
+        const cutoffDate = cutoffRaw ? new Date(cutoffRaw) : null;
+
+        let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=50`;
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        };
+
+        const table = document.createElement("table");
+        const header = document.createElement("tr");
+        header.innerHTML = "<th>Дата</th><th>Посилання</th><th>Коментарі</th>";
+        table.appendChild(header);
+
+        let stop = false;
+
+        while (url && !stop) {
+          const res = await fetch(url, { headers });
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error?.message || "Помилка при запиті");
+          }
+
+          for (const msg of data.value) {
+            const msgDate = new Date(msg.createdDateTime);
+            if (cutoffDate && msgDate < cutoffDate) {
+              stop = true;
+              break;
+            }
+
+            if (!msg.replyToId && msg.webUrl) {
+              const repliesRes = await fetch(`https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages/${encodeURIComponent(msg.id)}/replies`, { headers });
+              const repliesData = await repliesRes.json();
+              const replies = Array.isArray(repliesData.value) ? repliesData.value : [];
+
+              if (!filterNoReplies || replies.length === 0) {
+                const row = document.createElement("tr");
+                const dateCell = document.createElement("td");
+                dateCell.textContent = msg.createdDateTime;
+
+                const linkCell = document.createElement("td");
+                const a = document.createElement("a");
+                a.href = msg.webUrl;
+                a.target = "_blank";
+                a.textContent = "Переглянути";
+                linkCell.appendChild(a);
+
+                const repliesCell = document.createElement("td");
+                if (replies.length > 0) {
+                  const ul = document.createElement("ul");
+                  for (const reply of replies) {
+                    const li = document.createElement("li");
+                    li.textContent = reply.body?.content?.substring(0, 100) || "(порожній)";
+                    ul.appendChild(li);
+                  }
+                  repliesCell.appendChild(ul);
+                } else {
+                  repliesCell.textContent = "—";
+                }
+
+                row.appendChild(dateCell);
+                row.appendChild(linkCell);
+                row.appendChild(repliesCell);
+                table.appendChild(row);
+              }
+            }
+          }
+
+          url = data["@odata.nextLink"] || null;
+        }
+
+        outputDiv.innerHTML = "";
+        outputDiv.appendChild(table);
+      } catch (error) {
+        outputDiv.innerHTML = `<p style='color:red;'>⚠️ ${error.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
