@@ -52,6 +52,7 @@
       border: 1px solid #30363d;
       padding: 0.6em 1em;
       text-align: left;
+      vertical-align: top;
     }
     th {
       background-color: #21262d;
@@ -68,6 +69,10 @@
     li {
       margin-bottom: 0.2em;
     }
+    .wrap-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -81,46 +86,66 @@
       Дата до (UTC): <input type="datetime-local" id="cutoffDate" />
     </label>
   </div>
-
   <hr>
   <div id="output"></div>
 
   <script>
+    function createCell(content, className) {
+      const cell = document.createElement("td");
+      if (content instanceof Node) cell.appendChild(content);
+      else cell.textContent = content;
+      if (className) cell.classList.add(className);
+      return cell;
+    }
+
+    function createReplyList(replies) {
+      if (!replies.length) return "—";
+      const ul = document.createElement("ul");
+      replies.forEach(r => {
+        const li = document.createElement("li");
+        li.textContent = r.body?.content?.substring(0, 100) || "(порожній)";
+        ul.appendChild(li);
+      });
+      return ul;
+    }
+
+    function extractLastTextBlock(content) {
+      try {
+        const json = JSON.parse(content || "{}");
+        const blocks = json.body?.filter?.(b => b.type === "TextBlock");
+        return blocks?.[blocks.length - 1]?.text || "(немає опису)";
+      } catch {
+        return content || "(невірний формат)";
+      }
+    }
+
     async function loadMessages() {
       const outputDiv = document.getElementById("output");
       outputDiv.innerHTML = "Завантаження...";
 
       try {
-        const response = await fetch("config.json");
-        const config = await response.json();
+        const config = await (await fetch("config.json")).json();
+        const { token, teamId, channelId } = config;
 
-        const token = config.token;
-        const teamId = config.teamId;
-        const channelId = config.channelId;
-        const filterNoReplies = document.getElementById("filterNoReplies").checked;
-        const cutoffRaw = document.getElementById("cutoffDate").value;
-        const cutoffDate = cutoffRaw ? new Date(cutoffRaw) : null;
-
-        let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=50`;
         const headers = {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         };
 
+        const filterNoReplies = document.getElementById("filterNoReplies").checked;
+        const cutoffRaw = document.getElementById("cutoffDate").value;
+        const cutoffDate = cutoffRaw ? new Date(cutoffRaw) : null;
+
+        let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=10`;
         const table = document.createElement("table");
-        const header = document.createElement("tr");
-        header.innerHTML = "<th>Дата</th><th>Посилання</th><th>Коментарі</th>";
-        table.appendChild(header);
+        table.innerHTML = "<tr><th>Дата</th><th>Посилання</th><th>Коментарі</th><th>Опис</th></tr>";
 
         let stop = false;
-
         while (url && !stop) {
           const res = await fetch(url, { headers });
           const data = await res.json();
 
-          if (!res.ok) {
-            throw new Error(data.error?.message || "Помилка при запиті");
-          }
+          if (!res.ok) throw new Error(data.error?.message || "Помилка при запиті");
 
           for (const msg of data.value) {
             const msgDate = new Date(msg.createdDateTime);
@@ -130,38 +155,21 @@
             }
 
             if (!msg.replyToId && msg.webUrl) {
-              const repliesRes = await fetch(`https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages/${encodeURIComponent(msg.id)}/replies`, { headers });
-              const repliesData = await repliesRes.json();
-              const replies = Array.isArray(repliesData.value) ? repliesData.value : [];
+              const rRes = await fetch(`https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages/${encodeURIComponent(msg.id)}/replies`, { headers });
+              const replies = (await rRes.json()).value || [];
 
               if (!filterNoReplies || replies.length === 0) {
                 const row = document.createElement("tr");
-                const dateCell = document.createElement("td");
-                dateCell.textContent = msg.createdDateTime;
+                row.appendChild(createCell(msg.createdDateTime));
 
-                const linkCell = document.createElement("td");
                 const a = document.createElement("a");
                 a.href = msg.webUrl;
                 a.target = "_blank";
                 a.textContent = "Переглянути";
-                linkCell.appendChild(a);
+                row.appendChild(createCell(a));
 
-                const repliesCell = document.createElement("td");
-                if (replies.length > 0) {
-                  const ul = document.createElement("ul");
-                  for (const reply of replies) {
-                    const li = document.createElement("li");
-                    li.textContent = reply.body?.content?.substring(0, 100) || "(порожній)";
-                    ul.appendChild(li);
-                  }
-                  repliesCell.appendChild(ul);
-                } else {
-                  repliesCell.textContent = "—";
-                }
-
-                row.appendChild(dateCell);
-                row.appendChild(linkCell);
-                row.appendChild(repliesCell);
+                row.appendChild(createCell(createReplyList(replies)));
+                row.appendChild(createCell(extractLastTextBlock(msg.attachments?.[0]?.content), "wrap-text"));
                 table.appendChild(row);
               }
             }
