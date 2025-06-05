@@ -136,7 +136,7 @@
         const cutoffRaw = document.getElementById("cutoffDate").value;
         const cutoffDate = cutoffRaw ? new Date(cutoffRaw) : null;
 
-        let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=10`;
+        let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=10&$expand=replies`;
         const table = document.createElement("table");
         table.innerHTML = "<tr><th>Дата</th><th>Посилання</th><th>Коментарі</th><th>Опис</th></tr>";
 
@@ -155,8 +155,7 @@
             }
 
             if (!msg.replyToId && msg.webUrl) {
-              const rRes = await fetch(`https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages/${encodeURIComponent(msg.id)}/replies`, { headers });
-              const replies = (await rRes.json()).value || [];
+              const replies = msg.replies || [];
 
               if (!filterNoReplies || replies.length === 0) {
                 const row = document.createElement("tr");
