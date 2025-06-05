@@ -69,6 +69,9 @@
     li {
       margin-bottom: 0.2em;
     }
+    .selected {
+      background-color: #969ba3;
+    }
     .wrap-text {
       white-space: pre-wrap;
       word-break: break-word;
@@ -90,6 +93,7 @@
   <div id="output"></div>
 
   <script>
+    let selectedRow = null;
     function createCell(content, className) {
       const cell = document.createElement("td");
       if (content instanceof Node) cell.appendChild(content);
@@ -98,12 +102,20 @@
       return cell;
     }
 
+    function stripHtml(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html || '';
+      return tmp.textContent || '';
+    }
+
     function createReplyList(replies) {
       if (!replies.length) return "—";
       const ul = document.createElement("ul");
       replies.forEach(r => {
         const li = document.createElement("li");
-        li.textContent = r.body?.content?.substring(0, 100) || "(порожній)";
+        const author = r.from?.user?.displayName || "(невідомо)";
+        const text = stripHtml(r.body?.content).substring(0, 100) || "(порожній)";
+        li.textContent = `${author}: ${text}`;
         ul.appendChild(li);
       });
       return ul;
@@ -165,6 +177,11 @@
                 a.href = msg.webUrl;
                 a.target = "_blank";
                 a.textContent = "Переглянути";
+                a.addEventListener("click", () => {
+                  if (selectedRow) selectedRow.classList.remove("selected");
+                  row.classList.add("selected");
+                  selectedRow = row;
+                });
                 row.appendChild(createCell(a));
 
                 row.appendChild(createCell(createReplyList(replies)));
