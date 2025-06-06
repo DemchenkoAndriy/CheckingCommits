@@ -91,7 +91,7 @@
   </style>
 </head>
 <body>
-  <h2>Список повідомлень Teams — неперевірених: <span id="unreadCount">0</span></h2>
+  <h2>Список повідомлень Teams</h2>
   <div>
     <button onclick="loadMessages()">Завантажити повідомлення</button>
     <label style="margin-left: 1em">
@@ -107,23 +107,11 @@
   <script>
     let selectedRow = null;
     let graphHeaders, graphTeamId, graphChannelId;
-    let viewedReplies = JSON.parse(localStorage.getItem("viewedReplies") || "{}");
 
     document.addEventListener("DOMContentLoaded", () => {
       const savedDate = localStorage.getItem("cutoffDate");
       if (savedDate) document.getElementById("cutoffDate").value = savedDate;
     });
-
-    function updateUnreadCount() {
-      let count = 0;
-      document.querySelectorAll("tr[data-message-id]").forEach(r => {
-        const id = r.dataset.messageId;
-        const current = parseInt(r.dataset.replyCount || "0", 10);
-        const viewed = viewedReplies[id];
-        if (viewed === undefined || viewed < current) count++;
-      });
-      document.getElementById("unreadCount").textContent = count;
-    }
 
       async function refreshRow(row) {
         if (!row) return;
@@ -149,8 +137,6 @@
           return;
         }
 
-        const replyCount = (replies.value || []).length;
-        row.dataset.replyCount = replyCount;
         row.cells[2].innerHTML = "";
         const repliesContent = createReplyList(replies.value || []);
         if (repliesContent instanceof Node) {
@@ -159,10 +145,6 @@
           row.cells[2].textContent = repliesContent;
         }
         row.cells[3].textContent = extractLastTextBlock(message.attachments?.[0]?.content);
-
-        viewedReplies[id] = replyCount;
-        localStorage.setItem("viewedReplies", JSON.stringify(viewedReplies));
-        updateUnreadCount();
       }
     function createCell(content, className) {
       const cell = document.createElement("td");
@@ -251,7 +233,6 @@
               if (!filterNoReplies || replies.length === 0) {
                 const row = document.createElement("tr");
                 row.dataset.messageId = msg.id;
-                row.dataset.replyCount = replies.length;
                 row.appendChild(createCell(formatDate(msg.createdDateTime)));
 
                 const a = document.createElement("a");
@@ -283,7 +264,6 @@
 
         outputDiv.innerHTML = "";
         outputDiv.appendChild(table);
-        updateUnreadCount();
       } catch (error) {
         outputDiv.innerHTML = `<p style='color:red;'>⚠️ ${error.message}</p>`;
       }
