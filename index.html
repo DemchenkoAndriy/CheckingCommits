@@ -96,26 +96,39 @@
     let selectedRow = null;
     let graphHeaders, graphTeamId, graphChannelId;
 
-    async function refreshRow(row) {
-      if (!row) return;
-      const id = row.dataset.messageId;
-      if (!id || !graphHeaders) return;
-      const url = `https://graph.microsoft.com/beta/teams/${graphTeamId}/channels/${graphChannelId}/messages/${id}?$expand=replies`;
-      const res = await fetch(url, { headers: graphHeaders });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error?.message || "Помилка при запиті");
-        return;
+      async function refreshRow(row) {
+        if (!row) return;
+        const id = row.dataset.messageId;
+        if (!id || !graphHeaders) return;
+
+        const base = `https://graph.microsoft.com/beta/teams/${graphTeamId}/channels/${graphChannelId}/messages/${id}`;
+
+        const [msgRes, repliesRes] = await Promise.all([
+          fetch(base, { headers: graphHeaders }),
+          fetch(`${base}/replies`, { headers: graphHeaders })
+        ]);
+
+        const message = await msgRes.json();
+        const replies = await repliesRes.json();
+
+        if (!msgRes.ok) {
+          console.error(message.error?.message || "Помилка при запиті");
+          return;
+        }
+        if (!repliesRes.ok) {
+          console.error(replies.error?.message || "Помилка при запиті");
+          return;
+        }
+
+        row.cells[2].innerHTML = "";
+        const repliesContent = createReplyList(replies.value || []);
+        if (repliesContent instanceof Node) {
+          row.cells[2].appendChild(repliesContent);
+        } else {
+          row.cells[2].textContent = repliesContent;
+        }
+        row.cells[3].textContent = extractLastTextBlock(message.attachments?.[0]?.content);
       }
-      row.cells[2].innerHTML = "";
-      const repliesContent = createReplyList(data.replies || []);
-      if (repliesContent instanceof Node) {
-        row.cells[2].appendChild(repliesContent);
-      } else {
-        row.cells[2].textContent = repliesContent;
-      }
-      row.cells[3].textContent = extractLastTextBlock(data.attachments?.[0]?.content);
-    }
     function createCell(content, className) {
       const cell = document.createElement("td");
       if (content instanceof Node) cell.appendChild(content);
