@@ -108,7 +108,12 @@
         return;
       }
       row.cells[2].innerHTML = "";
-      row.cells[2].appendChild(createReplyList(data.replies || []));
+      const repliesContent = createReplyList(data.replies || []);
+      if (repliesContent instanceof Node) {
+        row.cells[2].appendChild(repliesContent);
+      } else {
+        row.cells[2].textContent = repliesContent;
+      }
       row.cells[3].textContent = extractLastTextBlock(data.attachments?.[0]?.content);
     }
     function createCell(content, className) {
