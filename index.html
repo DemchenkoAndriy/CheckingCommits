@@ -62,6 +62,18 @@
     a {
       color: #58a6ff;
     }
+    a.view-btn {
+      display: inline-block;
+      background-color: #238636;
+      color: #fff;
+      padding: 0.3em 0.6em;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+    a.view-btn:hover {
+      background-color: #2ea043;
+      text-decoration: none;
+    }
     ul {
       margin: 0;
       padding-left: 1.2em;
@@ -79,7 +91,7 @@
   </style>
 </head>
 <body>
-  <h2>Список повідомлень Teams</h2>
+  <h2>Список повідомлень Teams — неперевірених: <span id="unreadCount">0</span></h2>
   <div>
     <button onclick="loadMessages()">Завантажити повідомлення</button>
     <label style="margin-left: 1em">
@@ -95,6 +107,23 @@
   <script>
     let selectedRow = null;
     let graphHeaders, graphTeamId, graphChannelId;
+    let viewedReplies = JSON.parse(localStorage.getItem("viewedReplies") || "{}");
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedDate = localStorage.getItem("cutoffDate");
+      if (savedDate) document.getElementById("cutoffDate").value = savedDate;
+    });
+
+    function updateUnreadCount() {
+      let count = 0;
+      document.querySelectorAll("tr[data-message-id]").forEach(r => {
+        const id = r.dataset.messageId;
+        const current = parseInt(r.dataset.replyCount || "0", 10);
+        const viewed = viewedReplies[id];
+        if (viewed === undefined || viewed < current) count++;
+      });
+      document.getElementById("unreadCount").textContent = count;
+    }
 
       async function refreshRow(row) {
         if (!row) return;
@@ -120,6 +149,8 @@
           return;
         }
 
+        const replyCount = (replies.value || []).length;
+        row.dataset.replyCount = replyCount;
         row.cells[2].innerHTML = "";
         const repliesContent = createReplyList(replies.value || []);
         if (repliesContent instanceof Node) {
@@ -128,6 +159,10 @@
           row.cells[2].textContent = repliesContent;
         }
         row.cells[3].textContent = extractLastTextBlock(message.attachments?.[0]?.content);
+
+        viewedReplies[id] = replyCount;
+        localStorage.setItem("viewedReplies", JSON.stringify(viewedReplies));
+        updateUnreadCount();
       }
     function createCell(content, className) {
       const cell = document.createElement("td");
@@ -166,6 +201,12 @@
       }
     }
 
+    function formatDate(iso) {
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
     async function loadMessages() {
       const outputDiv = document.getElementById("output");
       outputDiv.innerHTML = "Завантаження...";
@@ -184,6 +225,7 @@
         const filterNoReplies = document.getElementById("filterNoReplies").checked;
         const cutoffRaw = document.getElementById("cutoffDate").value;
         const cutoffDate = cutoffRaw ? new Date(cutoffRaw) : null;
+        if (cutoffRaw) localStorage.setItem("cutoffDate", cutoffRaw);
 
         let url = `https://graph.microsoft.com/beta/teams/${teamId}/channels/${channelId}/messages?$top=10&$expand=replies`;
         const table = document.createElement("table");
@@ -209,12 +251,14 @@
               if (!filterNoReplies || replies.length === 0) {
                 const row = document.createElement("tr");
                 row.dataset.messageId = msg.id;
-                row.appendChild(createCell(msg.createdDateTime));
+                row.dataset.replyCount = replies.length;
+                row.appendChild(createCell(formatDate(msg.createdDateTime)));
 
                 const a = document.createElement("a");
                 a.href = msg.webUrl;
                 a.target = "_blank";
                 a.textContent = "Переглянути";
+                a.className = "view-btn";
                 row.appendChild(createCell(a));
 
                 row.addEventListener("click", async () => {
@@ -239,6 +283,7 @@
 
         outputDiv.innerHTML = "";
         outputDiv.appendChild(table);
+        updateUnreadCount();
       } catch (error) {
         outputDiv.innerHTML = `<p style='color:red;'>⚠️ ${error.message}</p>`;
       }
