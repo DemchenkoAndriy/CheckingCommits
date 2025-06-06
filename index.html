@@ -197,15 +197,17 @@
                 a.href = msg.webUrl;
                 a.target = "_blank";
                 a.textContent = "Переглянути";
-                a.addEventListener("click", async () => {
+                row.appendChild(createCell(a));
+
+                row.addEventListener("click", async () => {
                   if (selectedRow && selectedRow !== row) {
                     await refreshRow(selectedRow);
                     selectedRow.classList.remove("selected");
                   }
                   row.classList.add("selected");
                   selectedRow = row;
+                  await refreshRow(row);
                 });
-                row.appendChild(createCell(a));
 
                 row.appendChild(createCell(createReplyList(replies)));
                 row.appendChild(createCell(extractLastTextBlock(msg.attachments?.[0]?.content), "wrap-text"));
