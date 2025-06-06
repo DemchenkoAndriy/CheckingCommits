@@ -208,8 +208,18 @@
         e.preventDefault();
         e.stopPropagation();
       }
-      if (commitUrl) window.open(commitUrl, "_blank");
-      if (row) await refreshRow(row);
+      if (selectedRow && selectedRow !== row) {
+        refreshRow(selectedRow);
+        selectedRow.classList.remove("selected");
+      }
+      if (row) {
+        row.classList.add("selected");
+        selectedRow = row;
+      }
+      if (commitUrl) {
+        console.log(commitUrl);
+        window.open(commitUrl, "_blank");
+      }
       const deepLink = getTeamsDeepLink(webUrl);
       if (!deepLink) return;
       window.location.href = deepLink;
