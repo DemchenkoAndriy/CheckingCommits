@@ -94,6 +94,26 @@
 
   <script>
     let selectedRow = null;
+    let graphHeaders, graphTeamId, graphChannelId;
+
+    async function refreshRow(row) {
+      if (!row) return;
+      const id = row.dataset.messageId;
+      if (!id || !graphHeaders) return;
+      const url = `https://graph.microsoft.com/beta/teams/${graphTeamId}/channels/${graphChannelId}/messages/${id}?$expand=replies`;
+      const res = await fetch(url, { headers: graphHeaders });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error?.message || "Помилка при запиті");
+        return;
+      }
+      const repliesContent = createReplyList(data.replies || []);
+      const commentsCell = row.cells[2];
+      commentsCell.innerHTML = "";
+      if (repliesContent instanceof Node) commentsCell.appendChild(repliesContent);
+      else commentsCell.textContent = repliesContent;
+      row.cells[3].textContent = extractLastTextBlock(data.attachments?.[0]?.content);
+    }
     function createCell(content, className) {
       const cell = document.createElement("td");
       if (content instanceof Node) cell.appendChild(content);
@@ -139,10 +159,12 @@
         const config = await (await fetch("config.json")).json();
         const { token, teamId, channelId } = config;
 
-        const headers = {
+        graphHeaders = {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         };
+        graphTeamId = teamId;
+        graphChannelId = channelId;
 
         const filterNoReplies = document.getElementById("filterNoReplies").checked;
         const cutoffRaw = document.getElementById("cutoffDate").value;
@@ -154,7 +176,7 @@
 
         let stop = false;
         while (url && !stop) {
-          const res = await fetch(url, { headers });
+          const res = await fetch(url, { headers: graphHeaders });
           const data = await res.json();
 
           if (!res.ok) throw new Error(data.error?.message || "Помилка при запиті");
@@ -171,16 +193,25 @@
 
               if (!filterNoReplies || replies.length === 0) {
                 const row = document.createElement("tr");
+                row.dataset.messageId = msg.id;
                 row.appendChild(createCell(msg.createdDateTime));
 
                 const a = document.createElement("a");
                 a.href = msg.webUrl;
                 a.target = "_blank";
                 a.textContent = "Переглянути";
-                a.addEventListener("click", () => {
-                  if (selectedRow) selectedRow.classList.remove("selected");
-                  row.classList.add("selected");
-                  selectedRow = row;
+                a.addEventListener("click", async () => {
+                  if (selectedRow && selectedRow !== row) {
+                    const prev = selectedRow;
+                    prev.classList.remove("selected");
+                    selectedRow = row;
+                    row.classList.add("selected");
+                    await refreshRow(prev);
+                  } else {
+                    if (selectedRow) selectedRow.classList.remove("selected");
+                    row.classList.add("selected");
+                    selectedRow = row;
+                  }
                 });
                 row.appendChild(createCell(a));
 
