@@ -197,7 +197,8 @@
     function getCommitUrl(content) {
       try {
         const json = JSON.parse(content || "{}");
-        return json.actions?.[0]?.url || "";
+        const blocks = json.body?.filter?.(b => b.type === "ActionSet");
+        return blocks[0].actions[0].url || "";
       } catch {
         return "";
       }
@@ -216,6 +217,7 @@
         row.classList.add("selected");
         selectedRow = row;
       }
+console.log(commitUrl);
       if (commitUrl) {
         console.log(commitUrl);
         window.open(commitUrl, "_blank");
