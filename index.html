@@ -202,12 +202,6 @@
       const deepLink = getTeamsDeepLink(webUrl);
       if (!deepLink) return;
       window.location.href = deepLink;
-      setTimeout(() => {
-        if (!document.hidden) {
-          const openWeb = confirm("Не вдалося відкрити Teams. Відкрити у браузері?");
-          if (openWeb) window.open(webUrl, "_blank");
-        }
-      }, 1500);
     }
 
     async function loadMessages() {
