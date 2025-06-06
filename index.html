@@ -189,6 +189,27 @@
       return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
+    function getTeamsDeepLink(webUrl) {
+      if (!webUrl) return "";
+      return webUrl.replace(/^https:/, "msteams:");
+    }
+
+    function openInTeams(e, webUrl) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const deepLink = getTeamsDeepLink(webUrl);
+      if (!deepLink) return;
+      window.location.href = deepLink;
+      setTimeout(() => {
+        if (!document.hidden) {
+          const openWeb = confirm("Не вдалося відкрити Teams. Відкрити у браузері?");
+          if (openWeb) window.open(webUrl, "_blank");
+        }
+      }, 1500);
+    }
+
     async function loadMessages() {
       const outputDiv = document.getElementById("output");
       outputDiv.innerHTML = "Завантаження...";
@@ -236,10 +257,10 @@
                 row.appendChild(createCell(formatDate(msg.createdDateTime)));
 
                 const a = document.createElement("a");
-                a.href = msg.webUrl;
-                a.target = "_blank";
-                a.textContent = "Переглянути";
+                a.href = getTeamsDeepLink(msg.webUrl);
+                a.textContent = "Відкрити в Teams";
                 a.className = "view-btn";
+                a.addEventListener("click", e => openInTeams(e, msg.webUrl));
                 row.appendChild(createCell(a));
 
                 row.addEventListener("click", async () => {
