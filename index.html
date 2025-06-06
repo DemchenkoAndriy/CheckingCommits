@@ -107,11 +107,13 @@
         console.error(data.error?.message || "Помилка при запиті");
         return;
       }
+ 
       const repliesContent = createReplyList(data.replies || []);
       const commentsCell = row.cells[2];
       commentsCell.innerHTML = "";
       if (repliesContent instanceof Node) commentsCell.appendChild(repliesContent);
-      else commentsCell.textContent = repliesContent;
+      else commentsCell.textContent = repliesContent; 
+ 
       row.cells[3].textContent = extractLastTextBlock(data.attachments?.[0]?.content);
     }
     function createCell(content, className) {
@@ -202,6 +204,7 @@
                 a.textContent = "Переглянути";
                 a.addEventListener("click", async () => {
                   if (selectedRow && selectedRow !== row) {
+ 
                     const prev = selectedRow;
                     prev.classList.remove("selected");
                     selectedRow = row;
@@ -212,6 +215,7 @@
                     row.classList.add("selected");
                     selectedRow = row;
                   }
+ 
                 });
                 row.appendChild(createCell(a));
 
