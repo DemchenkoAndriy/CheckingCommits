@@ -194,11 +194,22 @@
       return webUrl.replace(/^https:/, "msteams:");
     }
 
-    function openInTeams(e, webUrl) {
+    function getCommitUrl(content) {
+      try {
+        const json = JSON.parse(content || "{}");
+        return json.actions?.[0]?.url || "";
+      } catch {
+        return "";
+      }
+    }
+
+    async function openInTeams(e, webUrl, commitUrl, row) {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
       }
+      if (commitUrl) window.open(commitUrl, "_blank");
+      if (row) await refreshRow(row);
       const deepLink = getTeamsDeepLink(webUrl);
       if (!deepLink) return;
       window.location.href = deepLink;
@@ -251,10 +262,11 @@
                 row.appendChild(createCell(formatDate(msg.createdDateTime)));
 
                 const a = document.createElement("a");
+                const commitLink = getCommitUrl(msg.attachments?.[0]?.content);
                 a.href = getTeamsDeepLink(msg.webUrl);
                 a.textContent = "Відкрити в Teams";
                 a.className = "view-btn";
-                a.addEventListener("click", e => openInTeams(e, msg.webUrl));
+                a.addEventListener("click", e => openInTeams(e, msg.webUrl, commitLink, row));
                 row.appendChild(createCell(a));
 
                 row.addEventListener("click", async () => {
